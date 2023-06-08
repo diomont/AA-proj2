@@ -5,6 +5,9 @@ from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import confusion_matrix
 
+import warnings
+warnings.filterwarnings('ignore',category=DeprecationWarning)
+
 from keras.models import Sequential
 from keras.layers import Dense
 from keras.wrappers.scikit_learn import KerasClassifier
@@ -112,11 +115,12 @@ for i in range(NUM_LOOPS):
     ### Linear Regression training and testing
 
     #Apply function print_gridsearch_scores to get the best C with the Undersampled dataset
-    best_c = gridsearch_score(X_train_undersample, y_train_undersample)
-    linreg_best_params.append(best_c)
+    #best_c = gridsearch_score(X_train_undersample, y_train_undersample)
+    #linreg_best_params.append(best_c)
 
     # Use the best C to train LogReg model with undersampled train data and test it
-    lr = LogisticRegression(C = best_c)
+    #lr = LogisticRegression(C = best_c)
+    lr = LogisticRegression(C = 0.01, solver="liblinear")
     lr.fit(X_train_undersample,y_train_undersample)
     y_pred = lr.predict(X)
     cnf_matrix = confusion_matrix(y, y_pred)
@@ -127,13 +131,15 @@ for i in range(NUM_LOOPS):
     ### NN training and testing
 
     # get best number and size of hidden layers for NN
-    best_params = gridsearch_score_deep_learning(X_train_undersample, y_train_undersample)
-    nn_best_params.append(best_params)
+    #best_params = gridsearch_score_deep_learning(X_train_undersample, y_train_undersample)
+    #nn_best_params.append(best_params)
 
     # Use the best hidden_dimension to train and Deep NN model with the under-sample data and test it
     input_dim = X_train_undersample.shape[1]
-    k = KerasClassifier(build_fn=network_builder, epochs=100, batch_size=128,
-                        hidden_dimensions=best_params, verbose=0, input_dim=input_dim)
+    #k = KerasClassifier(build_fn=network_builder, epochs=100, batch_size=128,
+    #                    hidden_dimensions=best_params, verbose=0, input_dim=input_dim)
+    k = KerasClassifier(build_fn=network_builder, epochs=800, batch_size=128,
+                        hidden_dimensions=[100, 100, 10], verbose=0, input_dim=input_dim)
     k.fit(X_train_undersample,y_train_undersample)
     y_pred = k.predict(X)
     cnf_matrix = confusion_matrix(y, y_pred)
@@ -141,19 +147,37 @@ for i in range(NUM_LOOPS):
     nn_recall_scores.append(cnf_matrix[1,1]/(cnf_matrix[1,0]+cnf_matrix[1,1]))
 
 
+### calculate averages
+tmp = np.dstack(linreg_cnf_matrices)
+linreg_cnf_mean = tmp.mean(axis=2)
+tmp = np.dstack(nn_cnf_matrices)
+nn_cnf_mean = tmp.mean(axis=2)
+
 ### print results
 with open("results.txt", "w") as fp:
 
     fp.write("---------- Linear Reg ----------\n")
 
-    for param, cnf, rec in zip(linreg_best_params, linreg_cnf_matrices, linreg_recall_scores):
-        fp.write(f"C: {param}, Recall: {rec}\n")
+    #for param, cnf, rec in zip(linreg_best_params, linreg_cnf_matrices, linreg_recall_scores):
+    for cnf, rec in zip(linreg_cnf_matrices, linreg_recall_scores):
+        #fp.write(f"C: {param}, Recall: {rec}\n")
+        fp.write(f"C: {0.01}, Recall: {rec}\n")
         fp.write(str(cnf))
         fp.write("\n")
     
+    fp.write("Mean confusion matrix:\n")
+    fp.write(str(linreg_cnf_mean) + "\n")
+    fp.write(f"Mean recall: {sum(linreg_recall_scores)/NUM_LOOPS}\n")
+    
     fp.write("---------- NN ----------\n")
 
-    for param, cnf, rec in zip(nn_best_params, nn_cnf_matrices, nn_recall_scores):
-        fp.write(f"Dims: {param}, Recall: {rec}\n")
+    #for param, cnf, rec in zip(nn_best_params, nn_cnf_matrices, nn_recall_scores):
+    for cnf, rec in zip(nn_cnf_matrices, nn_recall_scores):
+        #fp.write(f"Dims: {param}, Recall: {rec}\n")
+        fp.write(f"Dims: {[100, 100, 10]}, Recall: {rec}\n")
         fp.write(str(cnf))
         fp.write("\n")
+    
+    fp.write("Mean confusion matrix:\n")
+    fp.write(str(nn_cnf_mean) + "\n")
+    fp.write(f"Mean recall: {sum(nn_recall_scores)/NUM_LOOPS}\n")
